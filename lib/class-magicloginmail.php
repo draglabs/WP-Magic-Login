@@ -36,9 +36,10 @@ class MagicLoginMail {
 		add_action( 'init', array( $this, 'autologin_via_url' ) );
 		add_action( 'magic_email_send', array( $this, 'send_link' ), 10, 2 );
 		add_shortcode( 'magic_login', array( $this, 'front_end_login' ) );
-		add_action('wp_footer', function(){
-			$this->getMagicToken("developermanishhub@gmail.com", true, true, true);
-		});
+		add_shortcode( 'magic_login_custom', array( $this, 'front_end_login_custom' ) );
+		// add_action('wp_footer', function(){
+		// 	$this->getMagicToken("developermanishhub@gmail.com", true, true, true);
+		// });
 	}
 
 	/** ==================================================
@@ -131,6 +132,8 @@ class MagicLoginMail {
 
 			$uid = intval( sanitize_key( $_GET['uid'] ) );
 			$token = sanitize_key( $_GET['token'] );
+			
+			$custom_login_check = $this->_autologin_via_url();
 
 			$hash_meta = get_user_meta( $uid, 'magic_login_mail_' . $uid, true );
 			$hash_meta_expiration = get_user_meta( $uid, 'magic_login_mail_' . $uid . '_expiration', true );
@@ -287,14 +290,12 @@ class MagicLoginMail {
 	 * @param string $email  email.
 	 * @since 1.00
 	 */
-	private function generate_url( $email , $remove_url = false) {
+	private function generate_url( $email ) {
 
 		/* get user id */
 		$user = get_user_by( 'email', $email );
 		$token = $this->create_onetime_token( 'magic_login_mail_' . $user->ID, $user->ID );
-		if ($remove_url) {
-			return "uid=$user->ID&token=$token";
-		}
+
 		$arr_params = array( 'magic_login_mail_error_token', 'uid', 'token' );
 		$url = apply_filters( 'magic_login_mail_url', remove_query_arg( $arr_params, $this->curpageurl() ) );
 
@@ -343,17 +344,183 @@ class MagicLoginMail {
 
 	}
 
-	public function getMagicToken( string $email, bool $singleUse, bool $lifeSpan, bool $invalidates ){
-		if ($email = $this->valid_account($email) ) {
-			$user = get_user_by('email',$email);
-			if (user_can( $user->ID, 'manage_options' )) {
-				$metaString = 'magic_login_mail_' . $user->ID;
-				$unique_url = $this->generate_url( $email, true );
-				update_user_meta( $user->ID, $metaString."_single_use", $singleUse );
-				update_user_meta( $user->ID, $metaString."_lifeSpan", $lifeSpan );
-				update_user_meta( $user->ID, $metaString."_invalidates", $invalidates );
-				return $unique_url;
+	/** ==================================================
+	 * Create a nonce like token that you only use once based on transients
+	 *
+	 * @param string $action  action.
+	 * @param int    $user_id  user_id.
+	 * @param int    $life_Span  life_Span.
+	 * @return object
+	 * @since 1.00
+	 */
+	private function _create_onetime_token( $user_id, $life_Span ) {
+		try {
+			$time = time();
+			
+			/* random salt */
+			$key = wp_generate_password( 20, false );
+
+			require_once( ABSPATH . 'wp-includes/class-phpass.php' );
+			$wp_hasher = new PasswordHash( 8, true );
+			$string = $key . "magic_login_token_$user_id" . $time;
+
+			/* we're sending this to the user */
+			$token  = wp_hash( $string );
+			$expiration = $time + (60*$life_Span);
+
+			/* we're storing a combination of token and expiration */
+			$token = $wp_hasher->HashPassword( $token . $expiration );
+
+			return (object)[
+				"token" => $token,
+				"time" => $time,
+				"expiration" => $expiration
+			];
+		} catch (Exception $e) {
+			return $e->getMessage();
+		}
+	}
+
+	/** ==================================================
+	 * FrontEnd Shortcode HTML code
+	 *
+	 * @since 1.00
+	 */
+	public function front_end_login_custom(){
+		if (is_user_logged_in()) {
+			return ;
+		}
+		try {
+			if ( isset( $_POST['magic-submit-custom'] ) ) {
+				if ( ! empty( $_POST['nonce'] ) ) {
+					$nonce = sanitize_text_field( wp_unslash( $_POST['nonce'] ) );
+					if ( wp_verify_nonce( $nonce, 'magic_login_request' ) ) {
+						if ( ! empty( $_POST['magic_user_email_custom'] ) ) {
+							$email = sanitize_text_field( wp_unslash( $_POST['magic_user_email_custom'] ) );
+							$single_use = sanitize_text_field($_POST['single_use']);
+							$life_Span = sanitize_text_field($_POST['life_Span']);
+							$invalidates_on_creation = sanitize_text_field($_POST['invalidates_on_creation']);
+							$invalidates_others_on_use = sanitize_text_field($_POST['invalidates_others_on_use']);
+
+							$final_string = $this->getMagicToken($email, $single_use, $life_Span, $invalidates_on_creation, $invalidates_others_on_use);
+							echo "<p style='font-weight: bold;'>$final_string<p>";
+						}
+					}else{
+						throw new Exception("Refresh and try again token expire");
+					}
+				}else{
+					throw new Exception("Submission not verified. Refersh and try again.");
+				}
 			}
+		} catch (Exception $e) {
+			echo "<p style='font-weight: bold;'>$e->getMessage()</p>";
+		}
+
+		ob_start(); ?>
+			<h3>Test Custom Magic Link</h3>
+			<form action="<?php echo get_the_permalink(); ?>" method="post">
+				<label for="magic_user_email_custom">Login with email</label>
+				<input type="text" inputmode="url" pattern="[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" name="magic_user_email_custom" id="magic_user_email_custom" value="" />
+				<label for="single_use">Is Single use?</label>
+				<select name="single_use">
+					<option value=true>True</option>
+					<option value=false>False</option>
+				</select>
+				<label for="life_Span">Expire in (Value in Minute)</label>
+				<input type="number" min="5" name="life_Span" value="5">
+				<label for="invalidates_on_creation">Invalidates On Creation</label>
+				<select name="invalidates_on_creation">
+					<option value=true>True</option>
+					<option value=false>False</option>
+				</select>
+				<label for="invalidates_others_on_use">Invalidates Others On Use</label>
+				<select name="invalidates_others_on_use">
+					<option value=true>True</option>
+					<option value=false>False</option>
+				</select>
+				<?php wp_nonce_field( 'magic_login_request', 'nonce' ); ?>
+				<input type="submit" name="magic-submit-custom" value="Get Token">
+			</form>
+		<?php
+		return ob_get_clean();
+		
+	}
+
+	/** ==================================================
+	 * Create a Custom function to get token
+	 *
+	 * @param string    $email  Admin user email.
+	 * @param bool    $single_use  One time use token. If false - the token may be used many times.
+	 * @param int    $life_Span  After a set period of days this token will expire.
+	 * @param bool    $invalidates_on_creation  The moment this token is created it invalidates any other tokens the user may have created before.
+	 * @param bool    $invalidates_others_on_use  The moment this token is used it invalidated all other tokens the user may have created before.
+	 * @return string
+	 * @since 1.00
+	 */
+	public function getMagicToken( string $email, bool $single_use, int $life_span, bool $invalidates_on_creation, bool $invalidates_others_on_use ){
+		try {
+			if ($email = $this->valid_account($email) ) {
+				$user = get_user_by('email',$email);
+				if (user_can( $user->ID, 'manage_options' )) {
+					// Genrate token
+					$token = $this->_create_onetime_token( $user->ID, $life_span );
+					$meta_key = '_magic_login_tokens_' . $user->ID;
+					// Get Existing tokens and Update in DB.
+					$tokens = empty(get_user_meta($user->ID, $meta_key, true)) ? []:get_user_meta($user->ID, $meta_key, true);
+
+					$tokens[] = [
+						"token" => $token->token,
+						"single_use" => $single_use,
+						"life_span" => $life_span,
+						"invalidates_on_creation" => $invalidates_on_creation,
+						"invalidates_others_on_use" => $invalidates_others_on_use,
+						"create" => $token->time,
+						"expire" => $token->expiration
+					];
+					// Update or Create user meta.
+					update_user_meta( $user->ID, $meta_key, $tokens);
+					
+					return "uid=$user->ID&token=$token->token";
+				}else{
+					throw new Exception("User not Admin");
+				}
+			}else{
+				throw new Exception("Email not valid");
+			}
+		} catch (Exception $e) {
+			return $e->getMessage();
+		}
+	}
+	
+	/** ==================================================
+	 * Magic link custom login
+	 *
+	 * @since 1.00
+	 */
+	public function _autologin_via_url() {
+		$uid = intval( sanitize_key( $_GET['uid'] ) );
+		$token = $_GET['token'];
+		$tokens = get_user_meta( $uid, '_magic_login_tokens_' . $uid, true );
+
+		$key = array_search($token, array_column($tokens, 'token'));
+		$db_token = $tokens[$key];
+		$arr_params = array( 'uid', 'token' );
+		$current_page_url = remove_query_arg( $arr_params, $this->curpageurl() );
+
+		require_once( ABSPATH . 'wp-includes/class-phpass.php' );
+		$wp_hasher = new PasswordHash( 8, true );
+		$time = time();
+
+		if ( ! $wp_hasher->CheckPassword( $token . $db_token['expire'], $db_token['token'] ) || $db_token['expire'] < $time ) {
+			$url = add_query_arg( 'magic_login_mail_error_token', 'true', $current_page_url );
+			wp_redirect( $url );
+			exit;
+		} else {
+			wp_set_auth_cookie( $uid );
+			delete_user_meta( $uid, 'magic_login_mail_' . $uid );
+			delete_user_meta( $uid, 'magic_login_mail_' . $uid . '_expiration' );
+			wp_redirect( apply_filters( 'magic_login_mail_after_login_redirect', $current_page_url, $uid ) );
+			exit;
 		}
 	}
 }
