@@ -463,7 +463,10 @@ class MagicLoginMail {
 					// Genrate token
 					$token = $this->_create_onetime_token( $user->ID, $life_span );
 					$meta_key = '_magic_login_tokens_' . $user->ID;
+					
 					// Get Existing tokens and Update in DB.
+					// If enbale the invalidate on creation then other token will be deleted for the user and it will be add a single new token.
+					// Dose not effect other users.
 					if ($invalidates_on_creation == "false") {
 						$tokens = empty(get_user_meta($user->ID, $meta_key, true)) ? []:get_user_meta($user->ID, $meta_key, true);
 					}
@@ -519,6 +522,7 @@ class MagicLoginMail {
 				exit;
 			}
 			if ($db_token['invalidates_others_on_use'] == "true") {
+				$tokens[$key]['user_ip'] = $this->get_the_user_ip();
 				update_user_meta( $uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
 			}else{
 				delete_user_meta( $uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
@@ -526,6 +530,7 @@ class MagicLoginMail {
 			$tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
 			update_user_meta( $uid, '_magic_login_tokens_' . $uid, $tokens);
 			wp_set_auth_cookie( $uid );
+			setcookie('magic_login_token', true, 0);
 			wp_redirect( apply_filters( 'magic_login_mail_after_login_redirect', $current_page_url, $uid ) );
 			exit;
 		}
@@ -537,14 +542,16 @@ class MagicLoginMail {
 	 * @since 1.00
 	 */
 	public function magic_login_token_on_use_auth(){
-		$user = wp_get_current_user();
-		if (!empty($user->ID)) {
-			$token = get_user_meta($user->ID, "_magic_login_token_on_use_$user->ID", true);
-			$tokens = get_user_meta( $user->ID, '_magic_login_tokens_' . $user->ID, true );
-			$key = array_search($token, array_column($tokens, 'token'));
-			$db_token = $tokens[$key];
-			if ( $db_token['user_ip'] != $this->get_the_user_ip() ) {
-				wp_logout();
+		if ($_COOKIE['magic_login_token']) {
+			$user = wp_get_current_user();
+			if (!empty($user->ID)) {
+				$token = get_user_meta($user->ID, "_magic_login_token_on_use_$user->ID", true);
+				$tokens = get_user_meta( $user->ID, '_magic_login_tokens_' . $user->ID, true );
+				$key = array_search($token, array_column($tokens, 'token'));
+				$db_token = $tokens[$key];
+				if ( $db_token['user_ip'] != $this->get_the_user_ip() ) {
+					wp_logout();
+				}
 			}
 		}
 	}
