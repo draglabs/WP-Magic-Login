@@ -26,7 +26,14 @@
 	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+!defined('MAGICLOGINAPI_PATH') && define('MAGICLOGINAPI_PATH', plugin_dir_path( __FILE__ )); 
+
+require "admin/admin-setting.php";
+
 if ( ! class_exists( 'MagicLoginMail' ) ) {
 	require_once( dirname( __FILE__ ) . '/lib/class-magicloginmail.php' );
 }
 
+if ( ! class_exists( 'MagicLoginAPI' ) ) {
+	require_once( dirname( __FILE__ ) . '/lib/class-magicloginapi.php' );
+}
