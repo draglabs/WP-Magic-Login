@@ -2,18 +2,6 @@
 
 new MagicLoginAPI;
 
-// add_action('rest_api_init', function () {
-//     register_rest_route('myplugin/v1', '/author', array(
-//         'methods' => 'GET',
-//         'callback' => 'apiCall',
-//     ));
-// });
-
-// function apiCall()
-// {
-//     return new WP_REST_Response(["name" => "Manish API"], 200);
-// }
-
 class MagicLoginAPI extends WP_REST_Controller
 {
     public function __construct()
@@ -21,7 +9,7 @@ class MagicLoginAPI extends WP_REST_Controller
         add_action('init', [$this, 'magic_login_token_on_use_auth']);
         add_action('init', [$this, '_autologin_via_url']);
         add_action('init', [$this, 'register_routes']);
-        add_shortcode('magic_login_custom', array($this, 'front_end_login_custom'));
+        // add_shortcode('magic_login_custom', [$this, 'front_end_login_custom']);
     }
 
     /**
@@ -31,12 +19,118 @@ class MagicLoginAPI extends WP_REST_Controller
     {
         register_rest_route('magicloginapi/v1', '/get-token', array(
             'methods' => 'GET',
-            'callback' => [$this, 'apiCall'],
+            'callback' => [$this, 'magicloginapi_callback'],
         ));
     }
+    
+    /**
+    * API Callback function
+    */
+    public function magicloginapi_callback($request){
+        try {
+            $params = $request->get_params();
+            $email = $params['email'];
+            $single_use = $params['single_use'] ?? true;
+            $life_span = $params['life_span'] ?? 5;
+            $invalidates_on_creation = $params['invalidates_on_creation'] ?? true;
+            $invalidates_others_on_use = $params['invalidates_others_on_use'] ?? true;
+            $authtoken = $params['token'];
+            $custom_id = $params['custom_id'];
+            $passback = $params['passback'];
 
-    public function apiCall(){
-        return new WP_REST_Response(["name" => "Manish API"], 200);
+            // Get options
+            $options = get_option('magicloginapi_options');
+
+            if (empty($options)) {
+                throw new Exception("Magic login API settings not configured.");
+            }
+            if (!$authtoken) {
+                throw new Exception("token is required.");
+            }
+
+            if (!$email) {
+                throw new Exception("email is required.");
+            }
+
+            if ($authtoken != $options['api_token']) {
+                throw new Exception("Token mismatch authentication failed.");
+            }
+            
+            $data = $this->getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use);
+
+            $response = str_replace(
+                [
+                    '[token]',
+                    '[uid]',
+                    '[email]',
+                    '[custom_id]',
+                    '[passback]',
+                    '[user_firstname]',
+                    '[user_lastname]',
+                ],
+                [
+                    $data->token,
+                    $data->uid,
+                    $email,
+                    $custom_id,
+                    $passback,
+                    $data->first_name,
+                    $data->last_name
+                ],
+                $options['request_data']
+            );
+            $this->magicloginapi_hit_url($response,$options);
+
+            $response = json_decode($response);
+            $data = $this->prepare_response_for_collection( $response );
+            if ( 1 ) {
+                return new WP_REST_Response( [
+                    "code" => 200,
+                    "message" => "user data found",
+                    "data" => $data
+                ], 200 );
+            } else {
+                throw new Exception("something went wrong");
+            }
+        } catch (Exception $e) {
+            magiclogin_log( $e->getMessage() );
+            return new WP_Error( '401', __( $e->getMessage(), 'text-domain' ) );
+        }
+    }
+
+    /**
+    * Webhook hit function 
+    */
+    public function magicloginapi_hit_url($data, $options)
+    {
+        $curl = curl_init();
+
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => $options['api_url'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => $options['request_type'],
+            CURLOPT_POSTFIELDS => $data,
+            CURLOPT_HTTPHEADER => array(
+                'Accept: application/json',
+                'Content-Type: application/json'
+            ),
+        ));
+
+        $response = curl_exec($curl);
+        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        if (curl_errno($curl)) {
+            $error_msg = curl_error($curl);
+            throw new Exception($error_msg);
+        }
+        curl_close($curl);
+        if ( $httpcode != 200 ) {
+            throw new Exception('Someting went wrong while hitting '.$options['api_url'].'.');
+        }
     }
     /** ==================================================
      * Check if the account is valid from the email address.
@@ -112,6 +206,7 @@ class MagicLoginAPI extends WP_REST_Controller
             $stored_hash = $wp_hasher->HashPassword($token . $expiration);
 
             return (object)[
+                "uid" => $user_id,
                 "token" => $token,
                 "stored_hash" => $stored_hash,
                 "time" => $time,
@@ -194,7 +289,7 @@ class MagicLoginAPI extends WP_REST_Controller
      * @param int    $life_Span  After a set period of days this token will expire.
      * @param bool    $invalidates_on_creation  The moment this token is created it invalidates any other tokens the user may have created before.
      * @param bool    $invalidates_others_on_use  The moment this token is used it invalidated all other tokens the user may have created before.
-     * @return string
+     * @return object
      * @since 1.00
      */
     public function getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use)
@@ -203,8 +298,15 @@ class MagicLoginAPI extends WP_REST_Controller
             if ($email = $this->valid_account($email)) {
                 $user = get_user_by('email', $email);
                 if (user_can($user->ID, 'manage_options')) {
+                    
+                    $first_name = get_user_meta( $user->ID, 'first_name', true );
+                    $last_name = get_user_meta( $user->ID, 'last_name', true );
                     // Genrate token
                     $token = $this->_create_onetime_token($user->ID, $life_span);
+
+                    $token->first_name = $first_name;
+                    $token->last_name = $last_name;
+
                     $meta_key = '_magic_login_tokens_' . $user->ID;
 
                     // Get Existing tokens and Update in DB.
@@ -228,7 +330,8 @@ class MagicLoginAPI extends WP_REST_Controller
                     ];
                     // Update or Create user meta.
                     update_user_meta($user->ID, $meta_key, $tokens);
-                    return "uid=$user->ID&api_token=$token->token";
+                    return $token;
+                    // return "uid=$user->ID&api_token=$token->token";
                 } else {
                     throw new Exception("User not Admin");
                 }
