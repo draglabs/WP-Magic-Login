@@ -4,7 +4,7 @@
  * Plugin Name: Magic Login Mail
  * Description: Enter your email address, and send you an email with a magic link to login without a password.
  * Version: 1.05
- * Author: Katsushi Kawamori and David Strom
+ * Author: Katsushi Kawamori and David Strom and Manish Kumar
  * Author URI: https://riverforest-wp.info/
  * Text Domain: magic-login-mail
  *
