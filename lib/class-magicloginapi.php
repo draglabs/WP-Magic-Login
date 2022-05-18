@@ -22,11 +22,12 @@ class MagicLoginAPI extends WP_REST_Controller
             'callback' => [$this, 'magicloginapi_callback'],
         ));
     }
-    
+
     /**
-    * API Callback function
-    */
-    public function magicloginapi_callback($request){
+     * API Callback function
+     */
+    public function magicloginapi_callback($request)
+    {
         try {
             $params = $request->get_params();
             $email = $params['email'];
@@ -52,10 +53,10 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("email is required.");
             }
 
-            if ($authtoken != $options['api_token']) {
+            if ($authtoken != $options['wp_token']) {
                 throw new Exception("Token mismatch authentication failed.");
             }
-            
+
             $data = $this->getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use);
 
             $response = str_replace(
@@ -79,30 +80,37 @@ class MagicLoginAPI extends WP_REST_Controller
                 ],
                 $options['request_data']
             );
-            $this->magicloginapi_hit_url($response,$options);
+            $this->magicloginapi_hit_url($response, $options);
 
             $response = json_decode($response);
-            $data = $this->prepare_response_for_collection( $response );
-            if ( 1 ) {
-                return new WP_REST_Response( [
+            $data = $this->prepare_response_for_collection($response);
+            if (!empty($data)) {
+                return new WP_REST_Response([
                     "code" => 200,
                     "message" => "user data found",
                     "data" => $data
-                ], 200 );
+                ], 200);
             } else {
                 throw new Exception("something went wrong");
             }
         } catch (Exception $e) {
-            magiclogin_log( $e->getMessage() );
-            return new WP_Error( '401', __( $e->getMessage(), 'text-domain' ) );
+            magiclogin_log($e->getMessage());
+            return new WP_Error('401', __($e->getMessage(), 'text-domain'));
         }
     }
 
     /**
-    * Webhook hit function 
-    */
+     * Webhook hit function 
+     */
     public function magicloginapi_hit_url($data, $options)
     {
+        magiclogin_log("Magic Login trigger URL " . $options['api_url'], 'notice');
+
+        $headers = [
+            $options['api_name'] . ': ' . $options['api_token'],
+            'Content-Type: application/json',
+        ];
+
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
@@ -115,23 +123,27 @@ class MagicLoginAPI extends WP_REST_Controller
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             CURLOPT_CUSTOMREQUEST => $options['request_type'],
             CURLOPT_POSTFIELDS => $data,
-            CURLOPT_HTTPHEADER => array(
-                'Accept: application/json',
-                'Content-Type: application/json'
-            ),
+            CURLOPT_HTTPHEADER => $headers,
         ));
 
         $response = curl_exec($curl);
         $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
         if (curl_errno($curl)) {
             $error_msg = curl_error($curl);
             throw new Exception($error_msg);
         }
+
         curl_close($curl);
-        if ( $httpcode != 200 ) {
-            throw new Exception('Someting went wrong while hitting '.$options['api_url'].'.');
+
+        if ($httpcode != 200) {
+            throw new Exception('Someting went wrong while hitting ' . $options['api_url'] . '.');
+        } else {
+            $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
+            magiclogin_log("Trigger Success Response:</br>$response", 'success');
         }
     }
+    
     /** ==================================================
      * Check if the account is valid from the email address.
      *
@@ -277,7 +289,7 @@ class MagicLoginAPI extends WP_REST_Controller
             <?php wp_nonce_field('magic_login_request', 'nonce'); ?>
             <input type="submit" name="magic-submit-custom" value="Get Token">
         </form>
-        <?php
+<?php
         return ob_get_clean();
     }
 
@@ -298,9 +310,9 @@ class MagicLoginAPI extends WP_REST_Controller
             if ($email = $this->valid_account($email)) {
                 $user = get_user_by('email', $email);
                 if (user_can($user->ID, 'manage_options')) {
-                    
-                    $first_name = get_user_meta( $user->ID, 'first_name', true );
-                    $last_name = get_user_meta( $user->ID, 'last_name', true );
+
+                    $first_name = get_user_meta($user->ID, 'first_name', true);
+                    $last_name = get_user_meta($user->ID, 'last_name', true);
                     // Genrate token
                     $token = $this->_create_onetime_token($user->ID, $life_span);
 
@@ -331,7 +343,7 @@ class MagicLoginAPI extends WP_REST_Controller
                     // Update or Create user meta.
                     update_user_meta($user->ID, $meta_key, $tokens);
                     return $token;
-                    // return "uid=$user->ID&api_token=$token->token";
+                    // return "uid=$user->ID&magic_token=$token->token";
                 } else {
                     throw new Exception("User not Admin");
                 }
@@ -350,13 +362,13 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     public function _autologin_via_url()
     {
-        if (isset($_GET['api_token']) && isset($_GET['uid'])) {
+        if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
             $uid = intval(sanitize_key($_GET['uid']));
-            $token = $_GET['api_token'];
+            $token = $_GET['magic_token'];
             $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
             $key = array_search($token, array_column($tokens, 'token'));
             $db_token = $tokens[$key];
-            $arr_params = array('uid', 'api_token');
+            $arr_params = array('uid', 'magic_token');
             $current_page_url = remove_query_arg($arr_params, $this->curpageurl());
 
             require_once(ABSPATH . 'wp-includes/class-phpass.php');

@@ -4,7 +4,7 @@
  * Plugin Name: Magic Login Mail
  * Description: Enter your email address, and send you an email with a magic link to login without a password.
  * Version: 1.05
- * Author: Katsushi Kawamori and David Strom and Manish Kumar
+ * Author: Katsushi Kawamori, David Strom and Manish Kumar
  * Author URI: https://riverforest-wp.info/
  * Text Domain: magic-login-mail
  *
@@ -40,21 +40,16 @@
  * @return boolean|int Number of bytes written to the lof file, false otherwise.
  */
 if (!function_exists('magiclogin_log')) {
-	function magiclogin_log($entry, $mode = 'a', $file = 'magiclogin_log')
+	function magiclogin_log($msg = 'something went wrong', $type = 'error')
 	{
-		// Get WordPress uploads directory.
-		$upload_dir = wp_upload_dir();
-		$upload_dir = $upload_dir['basedir'];
-		// If the entry is array, json_encode.
-		if (is_array($entry)) {
-			$entry = json_encode($entry);
+		$logFileName = "magiclogin_log(" . date('d-m-Y') . ")";
+		$pluginlog = plugin_dir_path(__FILE__) . 'logs/' . $logFileName . '.log';
+		if (!file_exists(plugin_dir_path(__FILE__) . 'logs/')) {
+			mkdir(plugin_dir_path(__FILE__) . 'logs/', 0777, true);
 		}
-		// Write the log file.
-		$file  = $upload_dir . '/' . $file . '.log';
-		$file  = fopen($file, $mode);
-		$bytes = fwrite($file, current_time('mysql') . "::" . $entry . "\n");
-		fclose($file);
-		return $bytes;
+		$logDate = date('d-M-Y h:i:s A (e)');
+		$message = "[ $logDate ] : " . ucwords($type . " : " . strtolower($msg)) . PHP_EOL;
+		error_log($message, 3, $pluginlog);
 	}
 }
 
