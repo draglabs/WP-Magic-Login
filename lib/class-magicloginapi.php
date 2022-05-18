@@ -35,7 +35,7 @@ class MagicLoginAPI extends WP_REST_Controller
             $life_span = $params['life_span'] ?? 5;
             $invalidates_on_creation = $params['invalidates_on_creation'] ?? true;
             $invalidates_others_on_use = $params['invalidates_others_on_use'] ?? true;
-            $authtoken = $params['token'];
+            $wp_token = $params['wp_token'];
             $custom_id = $params['custom_id'];
             $passback = $params['passback'];
 
@@ -45,7 +45,7 @@ class MagicLoginAPI extends WP_REST_Controller
             if (empty($options)) {
                 throw new Exception("Magic login API settings not configured.");
             }
-            if (!$authtoken) {
+            if (!$wp_token) {
                 throw new Exception("token is required.");
             }
 
@@ -53,7 +53,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("email is required.");
             }
 
-            if ($authtoken != $options['wp_token']) {
+            if ($wp_token != $options['wp_token']) {
                 throw new Exception("Token mismatch authentication failed.");
             }
 
@@ -80,7 +80,30 @@ class MagicLoginAPI extends WP_REST_Controller
                 ],
                 $options['request_data']
             );
-            $this->magicloginapi_hit_url($response, $options);
+
+            $url = str_replace(
+                [
+                    '[token]',
+                    '[uid]',
+                    '[email]',
+                    '[custom_id]',
+                    '[passback]',
+                    '[user_firstname]',
+                    '[user_lastname]',
+                ],
+                [
+                    $data->token,
+                    $data->uid,
+                    $email,
+                    $custom_id,
+                    $passback,
+                    $data->first_name,
+                    $data->last_name
+                ],
+                $options['api_url']
+            );
+
+            $this->magicloginapi_hit_url($url,$response, $options);
 
             $response = json_decode($response);
             $data = $this->prepare_response_for_collection($response);
@@ -102,9 +125,9 @@ class MagicLoginAPI extends WP_REST_Controller
     /**
      * Webhook hit function 
      */
-    public function magicloginapi_hit_url($data, $options)
+    public function magicloginapi_hit_url($url,$data, $options)
     {
-        magiclogin_log("Magic Login trigger URL " . $options['api_url'], 'notice');
+        magiclogin_log("Magic Login trigger URL " . $url, 'notice');
 
         $headers = [
             $options['api_name'] . ': ' . $options['api_token'],
@@ -114,7 +137,7 @@ class MagicLoginAPI extends WP_REST_Controller
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
-            CURLOPT_URL => $options['api_url'],
+            CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => '',
             CURLOPT_MAXREDIRS => 10,
@@ -137,7 +160,7 @@ class MagicLoginAPI extends WP_REST_Controller
         curl_close($curl);
 
         if ($httpcode != 200) {
-            throw new Exception('Someting went wrong while hitting ' . $options['api_url'] . '.');
+            throw new Exception('Someting went wrong while hitting ' . $url . '.');
         } else {
             $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
             magiclogin_log("Trigger Success Response:</br>$response", 'success');
