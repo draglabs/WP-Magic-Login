@@ -24,7 +24,9 @@ class MagicLoginAPI extends WP_REST_Controller
     }
 
     /**
-     * API Callback function
+     * API Callback function - 
+     *   -to do- 
+     *   Take the default settings described below and add them as options in the admin panel. 
      */
     public function magicloginapi_callback($request)
     {
@@ -123,7 +125,7 @@ class MagicLoginAPI extends WP_REST_Controller
     }
 
     /**
-     * Webhook hit function 
+     * Webhook hit function - (post / put response)
      */
     public function magicloginapi_hit_url($url,$data, $options)
     {
