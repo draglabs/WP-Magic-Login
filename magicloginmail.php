@@ -1,15 +1,26 @@
 <?php
 
 /**
- * Plugin Name: Magic Login Mail
- * Description: Enter your email address, and send you an email with a magic link to login without a password.
- * Version: 1.05
- * Author: Katsushi Kawamori, David Strom and Manish Kumar
- * Author URI: https://riverforest-wp.info/
- * Text Domain: magic-login-mail
+ * @package           Magic Login API
+ * @author            David Strom and Manish Kumar
+ * @copyright         2019 DragLabs
+ * @license           GPL-2.0-or-later
  *
- * @package Magic Login Mail
+ * @wordpress-plugin
+ * Plugin Name:       Magic Login API
+ * Plugin URI:        https://draglabs.com/wp_magic_login_api
+ * Description:       Enter your email address, and send you an email with a magic link to login without a password.
+ * Version:           1.06.0
+ * Requires at least: 5.2
+ * Requires PHP:      7.4
+ * Author:            David Strom and Manish Kumar
+ * Author URI:        https://draglabs.com/
+ * Text Domain:       magic-login-mail-api
+ * License:           GPL v2 or later
+ * License URI:       
+ * Update URI:        https://example.com/my-plugin/
  */
+
 
 /*
 	Copyright (c) 2021- David Strom (email : david@draglabs.com)
@@ -32,7 +43,7 @@
 /**
  * Write an entry to a log file in the uploads directory.
  * 
- * @since x.x.x
+ * @since x.1.6
  * 
  * @param mixed $entry String or array of the information to write to the log.
  * @param string $file Optional. The file basename for the .log file.
