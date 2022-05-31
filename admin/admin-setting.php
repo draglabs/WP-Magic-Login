@@ -99,8 +99,62 @@ function magicloginapi_settings_init()
             'notes'  // $args for callback
         )
     );
-}
 
+    // Register a new setting for "magicloginapi_token_settings" page.
+    register_setting('magicloginapi_token_settings', 'magicloginapi_token_settings_options', 'magicloginapi_token_settings_validation_sanitization');
+
+    // Register a new section in the "magicloginapi_token_settings" page.
+    add_settings_section(
+        'magicloginapi_token_settings_section',
+        __('', 'magicloginapi_token_settings'),
+        'magicloginapi_token_settings_section_callback',
+        'magicloginapi_token_settings'
+    );
+
+    add_settings_field(
+        'single_use',
+        'Is Single use?',
+        'magicloginapi_options_select_boolean_callback',
+        'magicloginapi_token_settings',
+        'magicloginapi_token_settings_section',
+        array(
+            'single_use'
+        )
+    );
+
+    add_settings_field(
+        'life_span',
+        'Expire in (Value in Minute)',
+        'magicloginapi_options_number_callback',
+        'magicloginapi_token_settings',
+        'magicloginapi_token_settings_section',
+        array(
+            'life_span'  // $args for callback
+        )
+    );
+
+    add_settings_field(
+        'invalidates_on_creation',
+        'Invalidates On Creation',
+        'magicloginapi_options_select_boolean_callback',
+        'magicloginapi_token_settings',
+        'magicloginapi_token_settings_section',
+        array(
+            'invalidates_on_creation'
+        )
+    );
+
+    add_settings_field(
+        'invalidates_others_on_use',
+        'Invalidates Others On Use',
+        'magicloginapi_options_select_boolean_callback',
+        'magicloginapi_token_settings',
+        'magicloginapi_token_settings_section',
+        array(
+            'invalidates_others_on_use'
+        )
+    );
+}
 
 /**
  * Register our magicloginapi_settings_init to the admin_init action hook.
@@ -153,6 +207,23 @@ function magicloginapi_options_textarea_callback($args)
     echo '<textarea class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" rows=10 style="width:300px" '.$requried.'>' . $options[''  . $args[0] . ''] . '</textarea>';
 }
 
+function magicloginapi_options_select_boolean_callback($args)
+{
+    $options = get_option('magicloginapi_token_settings_options'); ?>
+    <select id="<?php echo $args[0]; ?>" name="<?php echo "magicloginapi_token_settings_options[$args[0]]"; ?>" required="required" style="width:300px">
+        <option value="">Select Type</option>
+        <option value="true" <?php selected($options[''  . $args[0] . ''], "true"); ?>>True</option>
+        <option value="false" <?php selected($options[''  . $args[0] . ''], "false"); ?>>False</option>
+    </select>
+<?php
+}
+
+function magicloginapi_options_number_callback($args)
+{
+    $options = get_option('magicloginapi_token_settings_options');
+    echo '<input type="number" class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_token_settings_options['  . $args[0] . ']" min=1 value="' . $options[''  . $args[0] . '']  . '" required="required" style="width:300px">';
+}
+
 /**
  * Developers section callback function.
  *
@@ -189,6 +260,16 @@ function magicloginapi_options_page()
         'manage_options',
         'magic-login-logs',
         'magicloginapi_logs_page_html'
+    );
+
+    add_submenu_page(
+        'magic-login-api',
+        'Token Settings',
+        'Token Settings',
+        'manage_options',
+        'magic-login-token-settings',
+        'magicloginapi_token_settings_page_html',
+        1
     );
 }
 
@@ -280,6 +361,7 @@ function magicloginapi_logs_page_html()
                     return false;
                 }
             });
+            jQuery(".logDiv").scrollTop(jQuery(".logDiv")[0].scrollHeight);
         });
     </script>
     <?php
@@ -348,6 +430,33 @@ function magicloginapi_options_page_html()
             document.body.removeChild(sampleTextarea);
         }
     </script>
+    <?php
+}
+
+// Token Settings PAGE
+function magicloginapi_token_settings_page_html(){
+    // check user capabilities
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    // show error/update messages
+    settings_errors(); ?>
+
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        <form action="options.php" method="post">
+            <?php
+            // output security fields for the registered setting "magicloginapi_token_settings"
+            settings_fields('magicloginapi_token_settings');
+            // output setting sections and their fields
+            // (sections are registered for "magicloginapi_token_settings", each field is registered to a specific section)
+            do_settings_sections('magicloginapi_token_settings');
+            // output save settings button
+            submit_button('Save Token Settings');
+            ?>
+        </form>
+    </div>
     <?php
 }
 

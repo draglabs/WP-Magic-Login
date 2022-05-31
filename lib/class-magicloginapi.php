@@ -24,22 +24,23 @@ class MagicLoginAPI extends WP_REST_Controller
     }
 
     /**
-     * API Callback function - 
-     *   -to do- 
-     *   Take the default settings described below and add them as options in the admin panel. 
+     * API Callback function
      */
     public function magicloginapi_callback($request)
     {
         try {
             $params = $request->get_params();
             $email = $params['email'];
-            $single_use = $params['single_use'] ?? true;
-            $life_span = $params['life_span'] ?? 5;
-            $invalidates_on_creation = $params['invalidates_on_creation'] ?? true;
-            $invalidates_others_on_use = $params['invalidates_others_on_use'] ?? true;
             $wp_token = $params['wp_token'];
             $custom_id = $params['custom_id'];
             $passback = $params['passback'];
+
+            $token_settings = get_option('magicloginapi_token_settings_options');
+
+            $single_use = $token_settings['single_use'] ?? true;
+            $life_span = $token_settings['life_span'] ?? 5;
+            $invalidates_on_creation = $token_settings['invalidates_on_creation'] ?? true;
+            $invalidates_others_on_use = $token_settings['invalidates_others_on_use'] ?? true;
 
             // Get options
             $options = get_option('magicloginapi_options');
@@ -119,13 +120,13 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("something went wrong");
             }
         } catch (Exception $e) {
-            magiclogin_log($e->getMessage());
-            return new WP_Error('401', __($e->getMessage(), 'text-domain'));
+            magiclogin_log("Line: " .$e->getLine()." | ".$e->getMessage());
+            return new WP_Error('401', __("Line: " .$e->getLine()." | ".$e->getMessage(), 'text-domain'));
         }
     }
 
     /**
-     * Webhook hit function - (post / put response)
+     * Webhook hit function 
      */
     public function magicloginapi_hit_url($url,$data, $options)
     {
@@ -160,11 +161,11 @@ class MagicLoginAPI extends WP_REST_Controller
         }
 
         curl_close($curl);
-
+        $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
         if ($httpcode != 200) {
-            throw new Exception('Someting went wrong while hitting ' . $url . '.');
+            magiclogin_log("Trigger Error Response:</br>$response");
+            throw new Exception("Someting went wrong while hitting $url");
         } else {
-            $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
             magiclogin_log("Trigger Success Response:</br>$response", 'success');
         }
     }
@@ -178,7 +179,7 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     private function valid_account($email)
     {
-
+        $email = str_replace(' ','+', $email);
         $valid_email = sanitize_email($email);
         if (is_email($valid_email) && email_exists($valid_email)) {
             return $valid_email;
@@ -250,7 +251,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 "expiration" => $expiration
             ];
         } catch (Exception $e) {
-            return $e->getMessage();
+            return "Line: " .$e->getLine()." | ".$e->getMessage();
         }
     }
 
@@ -286,7 +287,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 }
             }
         } catch (Exception $e) {
-            echo "<p style='font-weight: bold;'>$e->getMessage()</p>";
+            echo "<p style='font-weight: bold;'> Line: ".$e->getLine()." | ".$e->getMessage()."</p>";
         }
 
         ob_start(); ?>
@@ -334,7 +335,7 @@ class MagicLoginAPI extends WP_REST_Controller
         try {
             if ($email = $this->valid_account($email)) {
                 $user = get_user_by('email', $email);
-                if (user_can($user->ID, 'manage_options')) {
+                // if (user_can($user->ID, 'manage_options')) {
 
                     $first_name = get_user_meta($user->ID, 'first_name', true);
                     $last_name = get_user_meta($user->ID, 'last_name', true);
@@ -369,14 +370,14 @@ class MagicLoginAPI extends WP_REST_Controller
                     update_user_meta($user->ID, $meta_key, $tokens);
                     return $token;
                     // return "uid=$user->ID&magic_token=$token->token";
-                } else {
-                    throw new Exception("User not Admin");
-                }
+                // } else {
+                //     throw new Exception("User not Admin");
+                // }
             } else {
                 throw new Exception("Email not valid");
             }
         } catch (Exception $e) {
-            return $e->getMessage();
+            return "Line: " .$e->getLine() ." | ".$e->getMessage();
         }
     }
 
@@ -417,6 +418,10 @@ class MagicLoginAPI extends WP_REST_Controller
                 wp_set_auth_cookie($uid);
                 setcookie('magic_login_token', true, 0);
                 wp_redirect(apply_filters('magic_login_mail_after_login_redirect', $current_page_url, $uid));
+                exit;
+            }else{
+                $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
+                wp_redirect($url);
                 exit;
             }
         }
