@@ -161,12 +161,12 @@ class MagicLoginAPI extends WP_REST_Controller
         }
 
         curl_close($curl);
-        $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
+        // $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
         if ($httpcode != 200) {
-            magiclogin_log("Trigger Error Response:</br>$response");
+            magiclogin_log("Trigger Error Response:-$response");
             throw new Exception("Someting went wrong while hitting $url");
         } else {
-            magiclogin_log("Trigger Success Response:</br>$response", 'success');
+            magiclogin_log("Trigger Success Response:-$response", 'success');
         }
     }
     
@@ -315,7 +315,7 @@ class MagicLoginAPI extends WP_REST_Controller
             <?php wp_nonce_field('magic_login_request', 'nonce'); ?>
             <input type="submit" name="magic-submit-custom" value="Get Token">
         </form>
-<?php
+        <?php
         return ob_get_clean();
     }
 
@@ -401,7 +401,6 @@ class MagicLoginAPI extends WP_REST_Controller
             $wp_hasher = new PasswordHash(8, true);
             $time = time();
             if ($wp_hasher->CheckPassword($token . $db_token['expire'], $db_token['hash_token']) && $time < $db_token['expire']) {
-                var_dump($db_token['token_use_count']);
                 if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
                     $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
                     wp_redirect($url);

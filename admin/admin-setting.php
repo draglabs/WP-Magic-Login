@@ -44,7 +44,7 @@ function magicloginapi_settings_init()
             'wp_token' // $args for callback
         )
     );
-    
+
     add_settings_field(
         'api_url',
         'Enter your API endpoint where we will send the token',
@@ -204,7 +204,7 @@ function magicloginapi_options_textarea_callback($args)
         $requried = 'required="required"';
     }
     $options = get_option('magicloginapi_options');
-    echo '<textarea class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" rows=10 style="width:300px" '.$requried.'>' . $options[''  . $args[0] . ''] . '</textarea>';
+    echo '<textarea class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" rows=10 style="width:300px" ' . $requried . '>' . $options[''  . $args[0] . ''] . '</textarea>';
 }
 
 function magicloginapi_options_select_boolean_callback($args)
@@ -236,7 +236,10 @@ function magicloginapi_section_callback($args)
 <?php
 }
 
-
+function magicloginapi_token_settings_section_callback($args)
+{
+    // 
+}
 
 /**
  * Add the top level menu page.
@@ -281,14 +284,51 @@ add_action('admin_menu', 'magicloginapi_options_page');
 
 function magicloginapi_logs_page_html()
 {
-    $openFile = "magiclogin_log(" . date('d-m-Y') . ").log";
     if ($_REQUEST['log-action'] == 'view') {
         $openFile = $_REQUEST['log-file'];
-        error_log('', 3, dirname(plugin_dir_path(__FILE__)) . '/logs/debug.log');
     } elseif ($_REQUEST['log-action'] == 'delete') {
         unlink(dirname(plugin_dir_path(__FILE__)) . '/logs/' . $_REQUEST['log-file']);
         wp_redirect(home_url('/wp-admin/admin.php?page=magic-login-logs'));
     } ?>
+    <style>
+        .accordion {
+            background-color: #eee;
+            color: #444;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            transition: 0.4s;
+        }
+
+        .active,
+        .accordion:hover {
+            background-color: #ccc;
+        }
+
+        .accordion:after {
+            content: '\002B';
+            color: #777;
+            font-weight: bold;
+            float: right;
+            margin-left: 5px;
+        }
+
+        .active:after {
+            content: "\2212";
+        }
+
+        .panel {
+            padding: 0 18px;
+            background-color: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+        }
+    </style>
     <div class="container">
         <div class="wrap">
             <h1 class="wp-heading-inline">Logs</h1>
@@ -304,9 +344,7 @@ function magicloginapi_logs_page_html()
                             $ignore = array('cgi-bin', '.', '..', '._');
                             while (false !== ($entry = readdir($handle))) {
                                 if (!in_array($entry, $ignore) and substr($entry, 0, 1) != '.') {
-                                    $date = explode("(", $entry);
-                                    $date = strtotime(substr($date[1], 0, strpos($date[1], ")")));
-                                    $logFiles[$date] = $entry;
+                                    $logFiles[] = $entry;
                                 }
                             }
                             closedir($handle);
@@ -317,8 +355,9 @@ function magicloginapi_logs_page_html()
                                     if ($entry == $openFile) {
                                         $selected = 'selected';
                                     }
-                                }
-                        ?>
+                                } else {
+                                    $selected = (count($logFiles) == $key) ? 'selected' : '';
+                                } ?>
                                 <option value="<?php echo $entry; ?>" <?php echo $selected; ?>>
                                     <?php echo $entry; ?>
                                 </option>
@@ -332,19 +371,23 @@ function magicloginapi_logs_page_html()
                 </form>
             </div>
         </div>
-        <div class='logDiv' style='position: absolute; background-color: #fff; overflow: scroll; font-weight: 900; height: 400px; width: 98%;'>
+        <div class='logDiv' style='font-weight: 500; width: 98%;'>
             <?php
             if ($openFile == '') {
-                $openFile = $logFiles[0];
+                $openFile = $logFiles[count($logFiles) - 1];
             }
             $logFile = dirname(plugin_dir_path(__FILE__)) . '/logs/' . $openFile;
-            if (file_exists($logFile)) {
+            if (file_exists($logFile) && !empty($openFile)) {
                 $file = file($logFile);
-                echo "<pre>";
+                // echo "<pre>";
                 foreach ($file as $f) {
-                    echo $f . "<br />";
+                    echo "<button class='accordion'>" . limit_text($f, 8) . "</button>
+                            <div class='panel'>
+                                <p>$f</p>
+                            </div>";
+                    // echo $f . "<br />";
                 }
-                echo "</pre>";
+                // echo "</pre>";
             } else {
                 echo "<div class='notice notice-warning is-dismissible'>
                         <p>Log's File Is Not Exist </p>
@@ -355,6 +398,20 @@ function magicloginapi_logs_page_html()
     </div>
     <script type="text/javascript">
         jQuery(document).ready(function($) {
+            var acc = document.getElementsByClassName("accordion");
+            var i;
+
+            for (i = 0; i < acc.length; i++) {
+            acc[i].addEventListener("click", function() {
+                this.classList.toggle("active");
+                var panel = this.nextElementSibling;
+                if (panel.style.maxHeight) {
+                panel.style.maxHeight = null;
+                } else {
+                panel.style.maxHeight = panel.scrollHeight + "px";
+                } 
+            });
+            }
             $('#delete').click(function(e) {
                 var val = confirm("Please confirm to delete log file.");
                 if (val === false) {
@@ -364,7 +421,24 @@ function magicloginapi_logs_page_html()
             jQuery(".logDiv").scrollTop(jQuery(".logDiv")[0].scrollHeight);
         });
     </script>
-    <?php
+<?php
+}
+
+/**
+ * Truncate string as per limit.
+ */
+function limit_text($text, $limit)
+{
+    if ( str_contains(':-',$text) ) {
+
+    }else{
+        if (str_word_count($text, 0) > $limit) {
+            $words = str_word_count($text, 2);
+            $pos   = array_keys($words);
+            $text  = substr($text, 0, $pos[$limit]) . '...';
+        }
+    }
+    return $text;
 }
 
 /**
@@ -404,8 +478,8 @@ function magicloginapi_options_page_html()
         </form>
     </div>
     <script>
-        (function($){
-            $('#magiclogina_generate_token').click(function(){
+        (function($) {
+            $('#magiclogina_generate_token').click(function() {
                 var rand = function() {
                     return Math.random().toString(36).substr(2); // remove `0.`
                 };
@@ -417,10 +491,11 @@ function magicloginapi_options_page_html()
                 $('#wp_token').val(token);
             });
 
-            $('#magiclogina_copy_token').click(function(){
+            $('#magiclogina_copy_token').click(function() {
                 copyToClipboard($('#wp_token').val());
             });
         })(jQuery);
+
         function copyToClipboard(text) {
             var sampleTextarea = document.createElement("textarea");
             document.body.appendChild(sampleTextarea);
@@ -430,16 +505,17 @@ function magicloginapi_options_page_html()
             document.body.removeChild(sampleTextarea);
         }
     </script>
-    <?php
+<?php
 }
 
 // Token Settings PAGE
-function magicloginapi_token_settings_page_html(){
+function magicloginapi_token_settings_page_html()
+{
     // check user capabilities
     if (!current_user_can('manage_options')) {
         return;
     }
-    
+
     // show error/update messages
     settings_errors(); ?>
 
@@ -457,7 +533,7 @@ function magicloginapi_token_settings_page_html(){
             ?>
         </form>
     </div>
-    <?php
+<?php
 }
 
 //Fields Validation

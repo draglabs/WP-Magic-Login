@@ -51,10 +51,8 @@
  * @return boolean|int Number of bytes written to the lof file, false otherwise.
  */
 if (!function_exists('magiclogin_log')) {
-	function magiclogin_log($msg = 'something went wrong', $type = 'error')
-	{
-		$logFileName = "magiclogin_log(" . date('d-m-Y') . ")";
-		$pluginlog = plugin_dir_path(__FILE__) . 'logs/' . $logFileName . '.log';
+	function magiclogin_log($msg = 'something went wrong', $type = 'error'){
+		$pluginlog = plugin_dir_path(__FILE__) . 'logs/' . $type . '.log';
 		if (!file_exists(plugin_dir_path(__FILE__) . 'logs/')) {
 			mkdir(plugin_dir_path(__FILE__) . 'logs/', 0777, true);
 		}
