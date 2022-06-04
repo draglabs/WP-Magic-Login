@@ -174,7 +174,7 @@ function magicloginapi_options_select_callback($args)
         <option value="POST" <?php selected($options[''  . $args[0] . ''], "POST"); ?>>POST</option>
         <option value="PUT" <?php selected($options[''  . $args[0] . ''], "PUT"); ?>>PUT</option>
     </select>
-<?php
+    <?php
 }
 
 function magicloginapi_options_wp_token_callback($args)
@@ -215,7 +215,7 @@ function magicloginapi_options_select_boolean_callback($args)
         <option value="true" <?php selected($options[''  . $args[0] . ''], "true"); ?>>True</option>
         <option value="false" <?php selected($options[''  . $args[0] . ''], "false"); ?>>False</option>
     </select>
-<?php
+    <?php
 }
 
 function magicloginapi_options_number_callback($args)
@@ -230,10 +230,9 @@ function magicloginapi_options_number_callback($args)
  * @param array $args  The settings array, defining title, id, callback.
  */
 function magicloginapi_section_callback($args)
-{
-?>
+{ ?>
     <p id="<?php echo esc_attr($args['id']); ?>"><?php esc_html_e('To use the api call config below user will have to merge some information in and overall customize the JSON Post Request. Merge tage available :  [token] [uid] [email] [user_firstname] [user_lastname] [passback] OR [custom_id] In active campaign we are going to trigger a webhook which is going to hit wordpress. And then Wordpress is going to fire a post at active campaign setting a password. Then... then Active Campaign is going to use that token in an email. Then... Active campaign is going to delete that token from its database. ', 'magicloginapi'); ?></p>
-<?php
+    <?php
 }
 
 function magicloginapi_token_settings_section_callback($args)
@@ -339,31 +338,31 @@ function magicloginapi_logs_page_html()
                     <input type="hidden" name="page" value="magic-login-logs">
                     <select name="log-file">
                         <?php
-                        if ($handle = opendir(dirname(plugin_dir_path(__FILE__)) . '/logs')) {
-                            $logFiles = [];
-                            $ignore = array('cgi-bin', '.', '..', '._');
-                            while (false !== ($entry = readdir($handle))) {
-                                if (!in_array($entry, $ignore) and substr($entry, 0, 1) != '.') {
-                                    $logFiles[] = $entry;
+                            if ($handle = opendir(dirname(plugin_dir_path(__FILE__)) . '/logs')) {
+                                $logFiles = [];
+                                $ignore = array('cgi-bin', '.', '..', '._');
+                                while (false !== ($entry = readdir($handle))) {
+                                    if (!in_array($entry, $ignore) and substr($entry, 0, 1) != '.') {
+                                        $logFiles[] = $entry;
+                                    }
+                                }
+                                closedir($handle);
+                                krsort($logFiles);
+                                foreach ($logFiles as $key => $entry) {
+                                    $selected = '';
+                                    if ($openFile != '') {
+                                        if ($entry == $openFile) {
+                                            $selected = 'selected';
+                                        }
+                                    } else {
+                                        $selected = (count($logFiles) == $key) ? 'selected' : '';
+                                    } ?>
+                                    <option value="<?php echo $entry; ?>" <?php echo $selected; ?>>
+                                        <?php echo $entry; ?>
+                                    </option>
+                                    <?php
                                 }
                             }
-                            closedir($handle);
-                            krsort($logFiles);
-                            foreach ($logFiles as $key => $entry) {
-                                $selected = '';
-                                if ($openFile != '') {
-                                    if ($entry == $openFile) {
-                                        $selected = 'selected';
-                                    }
-                                } else {
-                                    $selected = (count($logFiles) == $key) ? 'selected' : '';
-                                } ?>
-                                <option value="<?php echo $entry; ?>" <?php echo $selected; ?>>
-                                    <?php echo $entry; ?>
-                                </option>
-                        <?php
-                            }
-                        }
                         ?>
                     </select>
                     <button class="button-primary" type="submit" name="log-action" value="view">View</button>
@@ -373,26 +372,23 @@ function magicloginapi_logs_page_html()
         </div>
         <div class='logDiv' style='font-weight: 500; width: 98%;'>
             <?php
-            if ($openFile == '') {
-                $openFile = $logFiles[count($logFiles) - 1];
-            }
-            $logFile = dirname(plugin_dir_path(__FILE__)) . '/logs/' . $openFile;
-            if (file_exists($logFile) && !empty($openFile)) {
-                $file = file($logFile);
-                // echo "<pre>";
-                foreach ($file as $f) {
-                    echo "<button class='accordion'>" . limit_text($f, 8) . "</button>
-                            <div class='panel'>
-                                <p>$f</p>
-                            </div>";
-                    // echo $f . "<br />";
+                if ($openFile == '') {
+                    $openFile = $logFiles[count($logFiles) - 1];
                 }
-                // echo "</pre>";
-            } else {
-                echo "<div class='notice notice-warning is-dismissible'>
-                        <p>Log's File Is Not Exist </p>
-                      </div>";
-            }
+                $logFile = dirname(plugin_dir_path(__FILE__)) . '/logs/' . $openFile;
+                if (file_exists($logFile) && !empty($openFile)) {
+                    $file = file($logFile);
+                    foreach ($file as $f) {
+                        echo "<button class='accordion'>" . limit_text($f, 8) . "</button>
+                                <div class='panel'>
+                                    <p>$f</p>
+                                </div>";
+                    }
+                } else {
+                    echo "<div class='notice notice-warning is-dismissible'>
+                            <p>Log's File Is Not Exist </p>
+                        </div>";
+                }
             ?>
         </div>
     </div>
@@ -402,15 +398,15 @@ function magicloginapi_logs_page_html()
             var i;
 
             for (i = 0; i < acc.length; i++) {
-            acc[i].addEventListener("click", function() {
-                this.classList.toggle("active");
-                var panel = this.nextElementSibling;
-                if (panel.style.maxHeight) {
-                panel.style.maxHeight = null;
-                } else {
-                panel.style.maxHeight = panel.scrollHeight + "px";
-                } 
-            });
+                acc[i].addEventListener("click", function() {
+                    this.classList.toggle("active");
+                    var panel = this.nextElementSibling;
+                    if (panel.style.maxHeight) {
+                        panel.style.maxHeight = null;
+                    } else {
+                        panel.style.maxHeight = panel.scrollHeight + "px";
+                    } 
+                });
             }
             $('#delete').click(function(e) {
                 var val = confirm("Please confirm to delete log file.");
@@ -421,7 +417,7 @@ function magicloginapi_logs_page_html()
             jQuery(".logDiv").scrollTop(jQuery(".logDiv")[0].scrollHeight);
         });
     </script>
-<?php
+    <?php
 }
 
 /**
@@ -429,8 +425,9 @@ function magicloginapi_logs_page_html()
  */
 function limit_text($text, $limit)
 {
-    if ( str_contains(':-',$text) ) {
-
+    $pos = stripos($text, ':-');
+    if ( $pos > -1 ) {
+        $text = substr($text, 0, $pos)."...";
     }else{
         if (str_word_count($text, 0) > $limit) {
             $words = str_word_count($text, 2);
