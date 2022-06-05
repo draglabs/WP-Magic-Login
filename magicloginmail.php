@@ -57,7 +57,7 @@ if (!function_exists('magiclogin_log')) {
 			mkdir(plugin_dir_path(__FILE__) . 'logs/', 0777, true);
 		}
 		$logDate = date('d-M-Y h:i:s A (e)');
-		$message = "[ $logDate ] : " . ucwords($type . " : " . strtolower($msg)) . PHP_EOL;
+		$message = "[ $logDate ] : " . ucwords($type . " : "). strtolower($msg) . PHP_EOL;
 		error_log($message, 3, $pluginlog);
 	}
 }

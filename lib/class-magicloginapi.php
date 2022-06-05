@@ -388,42 +388,58 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     public function _autologin_via_url()
     {
-        if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
-            $uid = intval(sanitize_key($_GET['uid']));
-            $token = $_GET['magic_token'];
-            $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
-            $key = array_search($token, array_column($tokens, 'token'));
-            $db_token = $tokens[$key];
-            $arr_params = array('uid', 'magic_token');
-            $current_page_url = remove_query_arg($arr_params, $this->curpageurl());
-
-            require_once(ABSPATH . 'wp-includes/class-phpass.php');
-            $wp_hasher = new PasswordHash(8, true);
-            $time = time();
-            if ($wp_hasher->CheckPassword($token . $db_token['expire'], $db_token['hash_token']) && $time < $db_token['expire']) {
-                if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
-                    $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
-                    wp_redirect($url);
+        try {
+            if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
+                magiclogin_log("Login trigger via magic login token", "notice");
+                $uid = intval(sanitize_key($_GET['uid']));
+                $token = $_GET['magic_token'];
+                $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
+                $key = array_search($token, array_column($tokens, 'token'));
+                $db_token = $tokens[$key];
+                $arr_params = array('uid', 'magic_token');
+                $current_page_url = remove_query_arg($arr_params, $this->curpageurl());
+                require_once(ABSPATH . 'wp-includes/class-phpass.php');
+                $wp_hasher = new PasswordHash(8, true);
+                $time = time();
+                if ($wp_hasher->CheckPassword($token . $db_token['expire'], $db_token['hash_token']) && $time < $db_token['expire']) {
+                    if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
+                        throw new Exception("This token is single use and it's already used $token");
+                    }
+                    if ($db_token['invalidates_others_on_use'] == "true") {
+                        $tokens[$key]['user_ip'] = $this->get_the_user_ip();
+                        update_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
+                    } else {
+                        delete_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
+                    }
+                    $tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
+                    update_user_meta($uid, '_magic_login_tokens_' . $uid, $tokens);
+                    setcookie('magic_login_token', true, 0);
+                    magiclogin_log("Login trigger via magic login successful", "notice");
+                    // wp_set_auth_cookie($uid);
+                    $user = get_user_by( 'id', $uid );
+                    $uid = (int) $uid;
+                    if( $user ) {
+                        wp_set_auth_cookie($uid);
+                        wp_set_current_user($uid);
+                    }else{
+                        throw new Exception("Login trigger via magic login token but user not found with ID: $uid");
+                    }
+                    wp_redirect(apply_filters('magic_login_mail_after_login_redirect', $current_page_url, $uid));
+                    if(!is_user_logged_in()){
+                        throw new Exception("Login trigger via magic login token/uid -> Someting went wrong... user id not able to set as auth");
+                    }
                     exit;
+                }else{
+                    throw new Exception("Login Token Not Valid Token is $token");   
                 }
-                if ($db_token['invalidates_others_on_use'] == "true") {
-                    $tokens[$key]['user_ip'] = $this->get_the_user_ip();
-                    update_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                } else {
-                    delete_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                }
-                $tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
-                update_user_meta($uid, '_magic_login_tokens_' . $uid, $tokens);
-                wp_set_auth_cookie($uid);
-                setcookie('magic_login_token', true, 0);
-                wp_redirect(apply_filters('magic_login_mail_after_login_redirect', $current_page_url, $uid));
-                exit;
-            }else{
-                $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
-                wp_redirect($url);
-                exit;
             }
+        } catch (Exception $e) {
+            magiclogin_log("Magic Login Error:- Line: " .$e->getLine()." | ".$e->getMessage());
+            $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
+            wp_redirect($url);
+            exit;
         }
+        
     }
 
     /** ==================================================

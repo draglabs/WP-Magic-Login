@@ -312,8 +312,8 @@ function magicloginapi_logs_page_html()
             content: '\002B';
             color: #777;
             font-weight: bold;
-            float: right;
-            margin-left: 5px;
+            float: left;
+            margin-right: 20px;
         }
 
         .active:after {
@@ -367,6 +367,7 @@ function magicloginapi_logs_page_html()
                     </select>
                     <button class="button-primary" type="submit" name="log-action" value="view">View</button>
                     <button class="button-primary" type="submit" id="delete" name="log-action" value="delete">Delete</button>
+                    <span style="float: right;margin-right: 22px;font-size: 15px;">Current Time: <?php echo date('d-M-Y h:i:s A (e)'); ?></span>
                 </form>
             </div>
         </div>
@@ -378,6 +379,7 @@ function magicloginapi_logs_page_html()
                 $logFile = dirname(plugin_dir_path(__FILE__)) . '/logs/' . $openFile;
                 if (file_exists($logFile) && !empty($openFile)) {
                     $file = file($logFile);
+                    $file = array_reverse($file);
                     foreach ($file as $f) {
                         echo "<button class='accordion'>" . limit_text($f, 8) . "</button>
                                 <div class='panel'>
