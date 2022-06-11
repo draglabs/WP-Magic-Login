@@ -10,7 +10,7 @@
  * Plugin Name:       Magic Login API
  * Plugin URI:        https://draglabs.com/wp_magic_login_api
  * Description:       Enter your email address, and send you an email with a magic link to login without a password.
- * Version:           1.06.0
+ * Version:           1.1.0
  * Requires at least: 5.2
  * Requires PHP:      7.4
  * Author:            David Strom and Manish Kumar
@@ -51,15 +51,13 @@
  * @return boolean|int Number of bytes written to the lof file, false otherwise.
  */
 if (!function_exists('magiclogin_log')) {
-	function magiclogin_log($msg = 'something went wrong', $type = 'error')
-	{
-		$logFileName = "magiclogin_log(" . date('d-m-Y') . ")";
-		$pluginlog = plugin_dir_path(__FILE__) . 'logs/' . $logFileName . '.log';
+	function magiclogin_log($msg = 'something went wrong', $type = 'error'){
+		$pluginlog = plugin_dir_path(__FILE__) . 'logs/' . $type . '.log';
 		if (!file_exists(plugin_dir_path(__FILE__) . 'logs/')) {
 			mkdir(plugin_dir_path(__FILE__) . 'logs/', 0777, true);
 		}
 		$logDate = date('d-M-Y h:i:s A (e)');
-		$message = "[ $logDate ] : " . ucwords($type . " : " . strtolower($msg)) . PHP_EOL;
+		$message = "[ $logDate ] : " . ucwords($type . " : "). strtolower($msg) . PHP_EOL;
 		error_log($message, 3, $pluginlog);
 	}
 }

@@ -6,7 +6,7 @@ class MagicLoginAPI extends WP_REST_Controller
 {
     public function __construct()
     {
-        add_action('init', [$this, 'magic_login_token_on_use_auth']);
+        // add_action('init', [$this, 'magic_login_token_on_use_auth']);
         add_action('init', [$this, '_autologin_via_url']);
         add_action('init', [$this, 'register_routes']);
         // add_shortcode('magic_login_custom', [$this, 'front_end_login_custom']);
@@ -24,22 +24,24 @@ class MagicLoginAPI extends WP_REST_Controller
     }
 
     /**
-     * API Callback function - 
-     *   -to do- 
-     *   Take the default settings described below and add them as options in the admin panel. 
+     * API Callback function
      */
     public function magicloginapi_callback($request)
     {
         try {
             $params = $request->get_params();
             $email = $params['email'];
-            $single_use = $params['single_use'] ?? true;
-            $life_span = $params['life_span'] ?? 5;
-            $invalidates_on_creation = $params['invalidates_on_creation'] ?? true;
-            $invalidates_others_on_use = $params['invalidates_others_on_use'] ?? true;
+            $email = str_replace(' ','+', $email);
             $wp_token = $params['wp_token'];
             $custom_id = $params['custom_id'];
             $passback = $params['passback'];
+
+            $token_settings = get_option('magicloginapi_token_settings_options');
+
+            $single_use = $token_settings['single_use'] ?? true;
+            $life_span = $token_settings['life_span'] ?? 5;
+            $invalidates_on_creation = $token_settings['invalidates_on_creation'] ?? true;
+            $invalidates_others_on_use = $token_settings['invalidates_others_on_use'] ?? true;
 
             // Get options
             $options = get_option('magicloginapi_options');
@@ -119,13 +121,13 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("something went wrong");
             }
         } catch (Exception $e) {
-            magiclogin_log($e->getMessage());
-            return new WP_Error('401', __($e->getMessage(), 'text-domain'));
+            magiclogin_log("Line: " .$e->getLine()." | ".$e->getMessage());
+            return new WP_Error('401', __("Line: " .$e->getLine()." | ".$e->getMessage(), 'text-domain'));
         }
     }
 
     /**
-     * Webhook hit function - (post / put response)
+     * Webhook hit function 
      */
     public function magicloginapi_hit_url($url,$data, $options)
     {
@@ -160,12 +162,12 @@ class MagicLoginAPI extends WP_REST_Controller
         }
 
         curl_close($curl);
-
+        // $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
         if ($httpcode != 200) {
-            throw new Exception('Someting went wrong while hitting ' . $url . '.');
+            magiclogin_log("Trigger Error Response:-$response");
+            throw new Exception("Someting went wrong while hitting $url");
         } else {
-            $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
-            magiclogin_log("Trigger Success Response:</br>$response", 'success');
+            magiclogin_log("Trigger Success Response:-$response", 'success');
         }
     }
     
@@ -178,7 +180,7 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     private function valid_account($email)
     {
-
+        $email = str_replace(' ','+', $email);
         $valid_email = sanitize_email($email);
         if (is_email($valid_email) && email_exists($valid_email)) {
             return $valid_email;
@@ -250,7 +252,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 "expiration" => $expiration
             ];
         } catch (Exception $e) {
-            return $e->getMessage();
+            return "Line: " .$e->getLine()." | ".$e->getMessage();
         }
     }
 
@@ -286,7 +288,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 }
             }
         } catch (Exception $e) {
-            echo "<p style='font-weight: bold;'>$e->getMessage()</p>";
+            echo "<p style='font-weight: bold;'> Line: ".$e->getLine()." | ".$e->getMessage()."</p>";
         }
 
         ob_start(); ?>
@@ -314,7 +316,7 @@ class MagicLoginAPI extends WP_REST_Controller
             <?php wp_nonce_field('magic_login_request', 'nonce'); ?>
             <input type="submit" name="magic-submit-custom" value="Get Token">
         </form>
-<?php
+        <?php
         return ob_get_clean();
     }
 
@@ -334,7 +336,7 @@ class MagicLoginAPI extends WP_REST_Controller
         try {
             if ($email = $this->valid_account($email)) {
                 $user = get_user_by('email', $email);
-                if (user_can($user->ID, 'manage_options')) {
+                // if (user_can($user->ID, 'manage_options')) {
 
                     $first_name = get_user_meta($user->ID, 'first_name', true);
                     $last_name = get_user_meta($user->ID, 'last_name', true);
@@ -369,14 +371,14 @@ class MagicLoginAPI extends WP_REST_Controller
                     update_user_meta($user->ID, $meta_key, $tokens);
                     return $token;
                     // return "uid=$user->ID&magic_token=$token->token";
-                } else {
-                    throw new Exception("User not Admin");
-                }
+                // } else {
+                //     throw new Exception("User not Admin");
+                // }
             } else {
                 throw new Exception("Email not valid");
             }
         } catch (Exception $e) {
-            return $e->getMessage();
+            return "Line: " .$e->getLine() ." | ".$e->getMessage();
         }
     }
 
@@ -387,39 +389,58 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     public function _autologin_via_url()
     {
-        if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
-            $uid = intval(sanitize_key($_GET['uid']));
-            $token = $_GET['magic_token'];
-            $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
-            $key = array_search($token, array_column($tokens, 'token'));
-            $db_token = $tokens[$key];
-            $arr_params = array('uid', 'magic_token');
-            $current_page_url = remove_query_arg($arr_params, $this->curpageurl());
-
-            require_once(ABSPATH . 'wp-includes/class-phpass.php');
-            $wp_hasher = new PasswordHash(8, true);
-            $time = time();
-            if ($wp_hasher->CheckPassword($token . $db_token['expire'], $db_token['hash_token']) && $time < $db_token['expire']) {
-                var_dump($db_token['token_use_count']);
-                if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
-                    $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
-                    wp_redirect($url);
+        try {
+            if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
+                magiclogin_log("Login trigger via magic login token", "notice");
+                $uid = intval(sanitize_key($_GET['uid']));
+                $token = $_GET['magic_token'];
+                $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
+                $key = array_search($token, array_column($tokens, 'token'));
+                $db_token = $tokens[$key];
+                $arr_params = array('uid', 'magic_token');
+                $current_page_url = remove_query_arg($arr_params, $this->curpageurl());
+                require_once(ABSPATH . 'wp-includes/class-phpass.php');
+                $wp_hasher = new PasswordHash(8, true);
+                $time = time();
+                if ($wp_hasher->CheckPassword($token . $db_token['expire'], $db_token['hash_token']) && $time < $db_token['expire']) {
+                    if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
+                        throw new Exception("This token is single use and it's already used $token");
+                    }
+                    if ($db_token['invalidates_others_on_use'] == "true") {
+                        $tokens[$key]['user_ip'] = $this->get_the_user_ip();
+                        update_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
+                    } else {
+                        delete_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
+                    }
+                    $tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
+                    update_user_meta($uid, '_magic_login_tokens_' . $uid, $tokens);
+                    setcookie('magic_login_token', true, 0);
+                    magiclogin_log("Login trigger via magic login successful", "notice");
+                    // wp_set_auth_cookie($uid);
+                    $user = get_user_by( 'id', $uid );
+                    $uid = (int) $uid;
+                    if( $user ) {
+                        wp_set_auth_cookie($uid);
+                        wp_set_current_user($uid);
+                    }else{
+                        throw new Exception("Login trigger via magic login token but user not found with ID: $uid");
+                    }
+                    wp_redirect(apply_filters('magic_login_mail_after_login_redirect', $current_page_url, $uid));
+                    if(!is_user_logged_in()){
+                        throw new Exception("Login trigger via magic login token/uid -> Someting went wrong... user id not able to set as auth");
+                    }
                     exit;
+                }else{
+                    throw new Exception("Login Token Not Valid Token is $token");   
                 }
-                if ($db_token['invalidates_others_on_use'] == "true") {
-                    $tokens[$key]['user_ip'] = $this->get_the_user_ip();
-                    update_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                } else {
-                    delete_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                }
-                $tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
-                update_user_meta($uid, '_magic_login_tokens_' . $uid, $tokens);
-                wp_set_auth_cookie($uid);
-                setcookie('magic_login_token', true, 0);
-                wp_redirect(apply_filters('magic_login_mail_after_login_redirect', $current_page_url, $uid));
-                exit;
             }
+        } catch (Exception $e) {
+            magiclogin_log("Magic Login Error:- Line: " .$e->getLine()." | ".$e->getMessage());
+            $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
+            wp_redirect($url);
+            exit;
         }
+        
     }
 
     /** ==================================================
