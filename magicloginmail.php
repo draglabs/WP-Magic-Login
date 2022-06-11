@@ -10,7 +10,7 @@
  * Plugin Name:       Magic Login API
  * Plugin URI:        https://draglabs.com/wp_magic_login_api
  * Description:       Enter your email address, and send you an email with a magic link to login without a password.
- * Version:           1.06.0
+ * Version:           1.1.0
  * Requires at least: 5.2
  * Requires PHP:      7.4
  * Author:            David Strom and Manish Kumar

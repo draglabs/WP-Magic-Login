@@ -144,16 +144,16 @@ function magicloginapi_settings_init()
         )
     );
 
-    add_settings_field(
-        'invalidates_others_on_use',
-        'Invalidates Others On Use',
-        'magicloginapi_options_select_boolean_callback',
-        'magicloginapi_token_settings',
-        'magicloginapi_token_settings_section',
-        array(
-            'invalidates_others_on_use'
-        )
-    );
+    // add_settings_field(
+    //     'invalidates_others_on_use',
+    //     'Invalidates Others On Use',
+    //     'magicloginapi_options_select_boolean_callback',
+    //     'magicloginapi_token_settings',
+    //     'magicloginapi_token_settings_section',
+    //     array(
+    //         'invalidates_others_on_use'
+    //     )
+    // );
 }
 
 /**

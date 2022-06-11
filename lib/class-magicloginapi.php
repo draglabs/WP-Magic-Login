@@ -6,7 +6,7 @@ class MagicLoginAPI extends WP_REST_Controller
 {
     public function __construct()
     {
-        add_action('init', [$this, 'magic_login_token_on_use_auth']);
+        // add_action('init', [$this, 'magic_login_token_on_use_auth']);
         add_action('init', [$this, '_autologin_via_url']);
         add_action('init', [$this, 'register_routes']);
         // add_shortcode('magic_login_custom', [$this, 'front_end_login_custom']);
@@ -31,6 +31,7 @@ class MagicLoginAPI extends WP_REST_Controller
         try {
             $params = $request->get_params();
             $email = $params['email'];
+            $email = str_replace(' ','+', $email);
             $wp_token = $params['wp_token'];
             $custom_id = $params['custom_id'];
             $passback = $params['passback'];
