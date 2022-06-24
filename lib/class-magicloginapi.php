@@ -6,7 +6,6 @@ class MagicLoginAPI extends WP_REST_Controller
 {
     public function __construct()
     {
-        // add_action('init', [$this, 'magic_login_token_on_use_auth']);
         add_action('init', [$this, '_autologin_via_url']);
         add_action('init', [$this, 'register_routes']);
         // add_shortcode('magic_login_custom', [$this, 'front_end_login_custom']);
@@ -336,8 +335,7 @@ class MagicLoginAPI extends WP_REST_Controller
         try {
             if ($email = $this->valid_account($email)) {
                 $user = get_user_by('email', $email);
-                // if (user_can($user->ID, 'manage_options')) {
-
+                if (!empty($user)) {
                     $first_name = get_user_meta($user->ID, 'first_name', true);
                     $last_name = get_user_meta($user->ID, 'last_name', true);
                     // Genrate token
@@ -370,10 +368,9 @@ class MagicLoginAPI extends WP_REST_Controller
                     // Update or Create user meta.
                     update_user_meta($user->ID, $meta_key, $tokens);
                     return $token;
-                    // return "uid=$user->ID&magic_token=$token->token";
-                // } else {
-                //     throw new Exception("User not Admin");
-                // }
+                } else {
+                    throw new Exception("User not exists");
+                }
             } else {
                 throw new Exception("Email not valid");
             }
@@ -389,6 +386,7 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     public function _autologin_via_url()
     {
+        global $wp_session;
         try {
             if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
                 magiclogin_log("Login trigger via magic login token", "notice");
@@ -406,22 +404,19 @@ class MagicLoginAPI extends WP_REST_Controller
                     if ($db_token['single_use'] == "true" && $db_token['token_use_count']) {
                         throw new Exception("This token is single use and it's already used $token");
                     }
-                    if ($db_token['invalidates_others_on_use'] == "true") {
-                        $tokens[$key]['user_ip'] = $this->get_the_user_ip();
-                        update_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                    } else {
-                        delete_user_meta($uid, '_magic_login_token_on_use_' . $uid, $db_token['token']);
-                    }
                     $tokens[$key]['token_use_count'] = (int)$tokens[$key]['token_use_count'] + 1;
-                    update_user_meta($uid, '_magic_login_tokens_' . $uid, $tokens);
-                    setcookie('magic_login_token', true, 0);
                     magiclogin_log("Login trigger via magic login successful", "notice");
-                    // wp_set_auth_cookie($uid);
                     $user = get_user_by( 'id', $uid );
                     $uid = (int) $uid;
+                    if ($db_token['invalidates_others_on_use'] == "true") {
+                        wp_set_current_user($uid);
+                        $user_id = get_current_user_id();
+                        $session = wp_get_session_token();
+                        $sessions = WP_Session_Tokens::get_instance($user_id);
+                        $sessions->destroy_others($session);
+                    }
                     if( $user ) {
                         wp_set_auth_cookie($uid);
-                        wp_set_current_user($uid);
                     }else{
                         throw new Exception("Login trigger via magic login token but user not found with ID: $uid");
                     }
@@ -441,27 +436,6 @@ class MagicLoginAPI extends WP_REST_Controller
             exit;
         }
         
-    }
-
-    /** ==================================================
-     * Display User IP in WordPress
-     *
-     * @since 1.00
-     */
-    public function magic_login_token_on_use_auth()
-    {
-        if ($_COOKIE['magic_login_token']) {
-            $user = wp_get_current_user();
-            if (!empty($user->ID)) {
-                $token = get_user_meta($user->ID, "_magic_login_token_on_use_$user->ID", true);
-                $tokens = get_user_meta($user->ID, '_magic_login_tokens_' . $user->ID, true);
-                $key = array_search($token, array_column($tokens, 'token'));
-                $db_token = $tokens[$key];
-                if ($db_token['user_ip'] != $this->get_the_user_ip()) {
-                    wp_logout();
-                }
-            }
-        }
     }
 
     /** ==================================================
