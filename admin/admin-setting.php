@@ -251,18 +251,19 @@ function magicloginapi_options_page()
         'manage_options',
         'magic-login-api',
         'magicloginapi_options_page_html',
-        'dashicons-rest-api',
+        content_url().'/plugins/magic-login-api/admin/core/assets/img/magic-login-icon_36.ico',
         77
     );
-
-    add_submenu_page(
-        'magic-login-api',
-        'Logs',
-        'Logs',
-        'manage_options',
-        'magic-login-logs',
-        'magicloginapi_logs_page_html'
-    );
+    if(magic_login_api_core()->can_use_premium_code()){
+        add_submenu_page(
+            'magic-login-api',
+            'Logs',
+            'Logs',
+            'manage_options',
+            'magic-login-logs',
+            'magicloginapi_logs_page_html'
+        );
+    }
 
     add_submenu_page(
         'magic-login-api',
@@ -528,7 +529,13 @@ function magicloginapi_token_settings_page_html()
             // (sections are registered for "magicloginapi_token_settings", each field is registered to a specific section)
             do_settings_sections('magicloginapi_token_settings');
             // output save settings button
-            submit_button('Save Token Settings');
+            if(magic_login_api_core()->can_use_premium_code()){
+                submit_button('Save Token Settings');
+            }else{
+                if ( magic_login_api_core()->is_not_paying() ) {
+                    echo '<a class="button button-primary" style="background: #269e24;border-color: #269e24;color: #fff;text-decoration: none;text-shadow: none;" href="' . magic_login_api_core()->get_upgrade_url() . '">' . __('Upgrade Now!', 'my-text-domain') . '</a>';
+                }
+            }
             ?>
         </form>
     </div>

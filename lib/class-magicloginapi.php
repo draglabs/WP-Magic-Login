@@ -59,7 +59,12 @@ class MagicLoginAPI extends WP_REST_Controller
             if ($wp_token != $options['wp_token']) {
                 throw new Exception("Token mismatch authentication failed.");
             }
-
+            $last = get_option('magic_login_api_trail', true);
+            if ($last > 150) {
+                return new WP_REST_Response([
+                    "message" => "Free plan is over please upgrade your plan. ".magic_login_api_core()->get_upgrade_url()
+                ], 404);
+            }
             $data = $this->getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use);
 
             $response = str_replace(
@@ -111,6 +116,10 @@ class MagicLoginAPI extends WP_REST_Controller
             $response = json_decode($response);
             $data = $this->prepare_response_for_collection($response);
             if (!empty($data)) {
+                if(!magic_login_api_core()->can_use_premium_code()){
+                    $last = get_option('magic_login_api_trail', true);
+                    update_option('magic_login_api_trail', $last + 1);
+                }
                 return new WP_REST_Response([
                     "code" => 200,
                     "message" => "user data found",

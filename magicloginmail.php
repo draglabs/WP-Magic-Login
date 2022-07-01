@@ -62,6 +62,7 @@ if (!function_exists('magiclogin_log')) {
 	}
 }
 
+require "lib/core.php";
 require "admin/admin-setting.php";
 
 if (!class_exists('MagicLoginMail')) {
