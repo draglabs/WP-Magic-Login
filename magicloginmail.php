@@ -11,14 +11,13 @@
  * Plugin URI:        https://draglabs.com/wp_magic_login_api
  * Description:       Enter your email address, and send you an email with a magic link to login without a password.
  * Version:           1.1.0
- * Requires at least: 5.2
+ * Requires at least: 5.9
  * Requires PHP:      7.4
  * Author:            David Strom and Manish Kumar
  * Author URI:        https://draglabs.com/
  * Text Domain:       magic-login-mail-api
- * License:           GPL v2 or later
- * License URI:       
- * Update URI:        https://example.com/my-plugin/
+ * License:           GPL v2 or later   
+ * License URI: 	  http://www.gnu.org/licenses/gpl-2.0.html
  */
 
 
@@ -61,6 +60,17 @@ if (!function_exists('magiclogin_log')) {
 		error_log($message, 3, $pluginlog);
 	}
 }
+
+register_activation_hook( __FILE__, function(){
+	if ( empty(get_option('magicloginapi_token_settings_options')) ) {
+		update_option('magicloginapi_token_settings_options', [
+			"single_use" => "true",
+			"life_span" => 5,
+			"invalidates_on_creation" => "true",
+			"invalidates_others_on_use" => "true"
+		]);
+	}
+});
 
 require "lib/core.php";
 require "admin/admin-setting.php";

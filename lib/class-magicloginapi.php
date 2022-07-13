@@ -8,7 +8,6 @@ class MagicLoginAPI extends WP_REST_Controller
     {
         add_action('init', [$this, '_autologin_via_url']);
         add_action('init', [$this, 'register_routes']);
-        // add_shortcode('magic_login_custom', [$this, 'front_end_login_custom']);
     }
 
     /**
@@ -29,11 +28,10 @@ class MagicLoginAPI extends WP_REST_Controller
     {
         try {
             $params = $request->get_params();
-            $email = $params['email'];
-            $email = str_replace(' ','+', $email);
-            $wp_token = $params['wp_token'];
-            $custom_id = $params['custom_id'];
-            $passback = $params['passback'];
+            $email = sanitize_email(str_replace(' ', '+',$params['email']));
+            $wp_token = sanitize_text_field($params['wp_token']);
+            $custom_id = sanitize_text_field($params['custom_id']);
+            $passback =  sanitize_text_field($params['passback']);
 
             $token_settings = get_option('magicloginapi_token_settings_options');
 
@@ -48,23 +46,26 @@ class MagicLoginAPI extends WP_REST_Controller
             if (empty($options)) {
                 throw new Exception("Magic login API settings not configured.");
             }
+
             if (!$wp_token) {
-                throw new Exception("token is required.");
+                throw new Exception("Token is required.");
             }
 
             if (!$email) {
-                throw new Exception("email is required.");
+                throw new Exception("Email is required.");
             }
 
             if ($wp_token != $options['wp_token']) {
                 throw new Exception("Token mismatch authentication failed.");
             }
             $last = get_option('magic_login_api_trail', true);
-            if ($last > 150) {
+            
+            if (magic_login_api_core()->can_use_premium_code()==false && $last > 150) {
                 return new WP_REST_Response([
                     "message" => "Free plan is over please upgrade your plan. ".magic_login_api_core()->get_upgrade_url()
                 ], 404);
             }
+
             $data = $this->getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use);
 
             $response = str_replace(
@@ -129,7 +130,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("something went wrong");
             }
         } catch (Exception $e) {
-            magiclogin_log("Line: " .$e->getLine()." | ".$e->getMessage());
+            magiclogin_log( __("Line: " .$e->getLine()." | ".$e->getMessage()) );
             return new WP_Error('401', __("Line: " .$e->getLine()." | ".$e->getMessage(), 'text-domain'));
         }
     }
@@ -140,42 +141,32 @@ class MagicLoginAPI extends WP_REST_Controller
     public function magicloginapi_hit_url($url,$data, $options)
     {
         magiclogin_log("Magic Login trigger URL " . $url, 'notice');
-
         $headers = [
-            $options['api_name'] . ': ' . $options['api_token'],
-            'Content-Type: application/json',
+            $options['api_name'] => $options['api_token'],
+            "Content-Type" => "application/json",
         ];
+            
+        $args = array(
+            'body'        => $data,
+            'timeout'     => '60',
+            'redirection' => '5',
+            'httpversion' => '1.0',
+            'blocking'    => true,
+            'headers'     => $headers,
+            'response'    => array('code'=> 200 , 'message'=>'ok'),
+            'cookies'     => array(),
+            'method'      => $options['request_type']
+        );
+        
+        $response = wp_remote_request($url, $args );
+        $http_code = wp_remote_retrieve_response_code( $response );
+        $body = wp_remote_retrieve_body( $response );
 
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => '',
-            CURLOPT_MAXREDIRS => 10,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => $options['request_type'],
-            CURLOPT_POSTFIELDS => $data,
-            CURLOPT_HTTPHEADER => $headers,
-        ));
-
-        $response = curl_exec($curl);
-        $httpcode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-        if (curl_errno($curl)) {
-            $error_msg = curl_error($curl);
-            throw new Exception($error_msg);
-        }
-
-        curl_close($curl);
-        // $response = json_encode(json_decode($response), JSON_PRETTY_PRINT);
-        if ($httpcode != 200) {
-            magiclogin_log("Trigger Error Response:-$response");
+        if ( $http_code != 200 ) {
+            magiclogin_log("Trigger Error Response:-$body");
             throw new Exception("Someting went wrong while hitting $url");
-        } else {
-            magiclogin_log("Trigger Success Response:-$response", 'success');
+        }else{
+            magiclogin_log("Trigger Success Response:-$body", 'success');
         }
     }
     
@@ -188,7 +179,6 @@ class MagicLoginAPI extends WP_REST_Controller
      */
     private function valid_account($email)
     {
-        $email = str_replace(' ','+', $email);
         $valid_email = sanitize_email($email);
         if (is_email($valid_email) && email_exists($valid_email)) {
             return $valid_email;
@@ -260,72 +250,8 @@ class MagicLoginAPI extends WP_REST_Controller
                 "expiration" => $expiration
             ];
         } catch (Exception $e) {
-            return "Line: " .$e->getLine()." | ".$e->getMessage();
+            return __( "Line: " .$e->getLine()." | ".$e->getMessage() );
         }
-    }
-
-    /** ==================================================
-     * FrontEnd Shortcode HTML code
-     *
-     * @since 1.00
-     */
-    public function front_end_login_custom()
-    {
-        if (is_user_logged_in()) {
-            return;
-        }
-        try {
-            if (isset($_POST['magic-submit-custom'])) {
-                if (!empty($_POST['nonce'])) {
-                    $nonce = sanitize_text_field(wp_unslash($_POST['nonce']));
-                    if (wp_verify_nonce($nonce, 'magic_login_request')) {
-                        if (!empty($_POST['magic_user_email_custom'])) {
-                            $email = sanitize_text_field(wp_unslash($_POST['magic_user_email_custom']));
-                            $single_use = sanitize_text_field($_POST['single_use']);
-                            $life_span = sanitize_text_field($_POST['life_span']);
-                            $invalidates_on_creation = sanitize_text_field($_POST['invalidates_on_creation']);
-                            $invalidates_others_on_use = sanitize_text_field($_POST['invalidates_others_on_use']);
-                            $final_string = $this->getMagicToken($email, $single_use, $life_span, $invalidates_on_creation, $invalidates_others_on_use);
-                            echo "<p style='font-weight: bold;'>$final_string<p>";
-                        }
-                    } else {
-                        throw new Exception("Refresh and try again token expire");
-                    }
-                } else {
-                    throw new Exception("Submission not verified. Refersh and try again.");
-                }
-            }
-        } catch (Exception $e) {
-            echo "<p style='font-weight: bold;'> Line: ".$e->getLine()." | ".$e->getMessage()."</p>";
-        }
-
-        ob_start(); ?>
-        <h3>Test Custom Magic Link</h3>
-        <form action="<?php echo get_the_permalink(); ?>" method="post">
-            <label for="magic_user_email_custom">Login with email</label>
-            <input type="text" inputmode="url" pattern="[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" name="magic_user_email_custom" id="magic_user_email_custom" value="" />
-            <label for="single_use">Is Single use?</label>
-            <select name="single_use">
-                <option value=true>True</option>
-                <option value=false>False</option>
-            </select>
-            <label for="life_span">Expire in (Value in Minute)</label>
-            <input type="number" min="5" name="life_span" value="5">
-            <label for="invalidates_on_creation">Invalidates On Creation</label>
-            <select name="invalidates_on_creation">
-                <option value=true>True</option>
-                <option value=false>False</option>
-            </select>
-            <label for="invalidates_others_on_use">Invalidates Others On Use</label>
-            <select name="invalidates_others_on_use">
-                <option value=true>True</option>
-                <option value=false>False</option>
-            </select>
-            <?php wp_nonce_field('magic_login_request', 'nonce'); ?>
-            <input type="submit" name="magic-submit-custom" value="Get Token">
-        </form>
-        <?php
-        return ob_get_clean();
     }
 
     /** ==================================================
@@ -384,7 +310,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 throw new Exception("Email not valid");
             }
         } catch (Exception $e) {
-            return "Line: " .$e->getLine() ." | ".$e->getMessage();
+            return __( "Line: " .$e->getLine() ." | ".$e->getMessage() );
         }
     }
 
@@ -439,7 +365,7 @@ class MagicLoginAPI extends WP_REST_Controller
                 }
             }
         } catch (Exception $e) {
-            magiclogin_log("Magic Login Error:- Line: " .$e->getLine()." | ".$e->getMessage());
+            magiclogin_log( __("Magic Login Error:- Line: " .$e->getLine()." | ".$e->getMessage()) );
             $url = add_query_arg('magic_login_mail_error_token', 'true', $current_page_url);
             wp_redirect($url);
             exit;

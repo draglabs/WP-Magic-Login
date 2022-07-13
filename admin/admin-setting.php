@@ -210,10 +210,13 @@ function magicloginapi_options_textarea_callback($args)
 function magicloginapi_options_select_boolean_callback($args)
 {
     $options = get_option('magicloginapi_token_settings_options'); ?>
-    <select id="<?php echo $args[0]; ?>" name="<?php echo "magicloginapi_token_settings_options[$args[0]]"; ?>" required="required" style="width:300px">
-        <option value="">Select Type</option>
+    <select id="<?php echo $args[0]; ?>" name="<?php echo "magicloginapi_token_settings_options[$args[0]]"; ?>" required="required" style="width:300px" <?php if(!magic_login_api_core()->can_use_premium_code()) : ?> onchange="Upgrade_now_setting()" <?php endif; ?>>
         <option value="true" <?php selected($options[''  . $args[0] . ''], "true"); ?>>True</option>
-        <option value="false" <?php selected($options[''  . $args[0] . ''], "false"); ?>>False</option>
+        <?php if(magic_login_api_core()->can_use_premium_code()) : ?>
+            <option value="false" <?php selected($options[''  . $args[0] . ''], "false"); ?>>False</option>
+        <?php else: ?>
+            <option value="false" <?php selected($options[''  . $args[0] . ''], "false"); ?>>False -- ( Upgrade Now! )</option>
+        <?php endif; ?>
     </select>
     <?php
 }
@@ -505,7 +508,7 @@ function magicloginapi_options_page_html()
             document.body.removeChild(sampleTextarea);
         }
     </script>
-<?php
+    <?php
 }
 
 // Token Settings PAGE
@@ -537,9 +540,14 @@ function magicloginapi_token_settings_page_html()
                 }
             }
             ?>
+            <script>
+                 function Upgrade_now_setting(){
+                    window.location = "<?php echo magic_login_api_core()->get_upgrade_url(); ?>";
+                }
+            </script>
         </form>
     </div>
-<?php
+    <?php
 }
 
 //Fields Validation
