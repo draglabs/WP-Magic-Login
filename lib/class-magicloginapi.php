@@ -326,7 +326,7 @@ class MagicLoginAPI extends WP_REST_Controller
             if (isset($_GET['magic_token']) && isset($_GET['uid'])) {
                 magiclogin_log("Login trigger via magic login token", "notice");
                 $uid = intval(sanitize_key($_GET['uid']));
-                $token = $_GET['magic_token'];
+                $token = sanitize_text_field($_GET['magic_token']);
                 $tokens = get_user_meta($uid, '_magic_login_tokens_' . $uid, true);
                 $key = array_search($token, array_column($tokens, 'token'));
                 $db_token = $tokens[$key];
@@ -379,15 +379,17 @@ class MagicLoginAPI extends WP_REST_Controller
      * @since 1.00
      */
     private function get_the_user_ip()
-    {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+    {   
+        $http_client_ip = sanitize_text_field($_SERVER['HTTP_CLIENT_IP']);
+        $http_x = sanitize_text_field($_SERVER['HTTP_X_FORWARDED_FOR']);
+        if (!empty($http_client_ip)) {
             //check ip from share internet
-            $ip = $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = $http_client_ip;
+        } elseif (!empty($http_x)) {
             //to check ip is pass from proxy
-            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            $ip = $http_x;
         } else {
-            $ip = $_SERVER['REMOTE_ADDR'];
+            $ip = sanitize_text_field($_SERVER['REMOTE_ADDR']);
         }
         return apply_filters('wpb_get_ip', $ip);
     }

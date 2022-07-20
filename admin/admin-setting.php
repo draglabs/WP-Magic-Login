@@ -188,13 +188,13 @@ function magicloginapi_options_wp_token_callback($args)
 function magicloginapi_options_textbox_callback($args)
 {
     $options = get_option('magicloginapi_options');
-    echo '<input type="text" class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" value="' . $options[''  . $args[0] . ''] . '" required="required" style="width:300px">';
+    echo _('<input type="text" class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" value="' . $options[''  . $args[0] . ''] . '" required="required" style="width:300px">');
 }
 
 function magicloginapi_options_texturl_callback($args)
 {
     $options = get_option('magicloginapi_options');
-    echo '<input type="url" class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" value="' . $options[''  . $args[0] . ''] . '" required="required" style="width:300px">';
+    echo _('<input type="url" class="magicloginapi_input" id="'  . $args[0] . '" name="magicloginapi_options['  . $args[0] . ']" value="' . $options[''  . $args[0] . ''] . '" required="required" style="width:300px">');
 }
 
 function magicloginapi_options_textarea_callback($args)
@@ -287,10 +287,11 @@ add_action('admin_menu', 'magicloginapi_options_page');
 
 function magicloginapi_logs_page_html()
 {
-    if ($_REQUEST['log-action'] == 'view') {
+    $logAction = sanitize_text_field($_REQUEST['log-action']);
+    if ($logAction == 'view') {
         $openFile = $_REQUEST['log-file'];
-    } elseif ($_REQUEST['log-action'] == 'delete') {
-        unlink(dirname(plugin_dir_path(__FILE__)) . '/logs/' . $_REQUEST['log-file']);
+    } elseif ($logAction == 'delete') {
+        unlink( dirname(plugin_dir_path(__FILE__)) . '/logs/' . sanitize_text_field($_REQUEST['log-file']) );
         wp_redirect(home_url('/wp-admin/admin.php?page=magic-login-logs'));
     } ?>
     <style>
@@ -361,8 +362,8 @@ function magicloginapi_logs_page_html()
                                     } else {
                                         $selected = (count($logFiles) == $key) ? 'selected' : '';
                                     } ?>
-                                    <option value="<?php echo $entry; ?>" <?php echo $selected; ?>>
-                                        <?php echo $entry; ?>
+                                    <option value="<?php echo _($entry); ?>" <?php echo $selected; ?>>
+                                        <?php echo _($entry); ?>
                                     </option>
                                     <?php
                                 }
