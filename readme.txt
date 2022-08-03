@@ -1,7 +1,7 @@
 === Magic Login API ===
-Contributors: Katsushi Kawamori,  David Strom, and Manish Kumar
-Donate link: https://shop.riverforest-wp.info/donate/
-Tags: email, login, passwordless, users
+Contributors: David Strom and Manish Kumar
+Website: https://www.draglabs.com
+Tags: api, login, passwordless, magic, email
 Requires at least: 5.4
 Requires PHP: 7.4
 Tested up to: 6.0.1
@@ -9,7 +9,7 @@ Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
-Automate genrate login tokens and magic link to log in without a password.
+Automate genrate login tokens and magic link to log in without a password. Compatible with any ESP. 
 
 == Description ==
 
